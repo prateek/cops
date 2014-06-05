@@ -6,6 +6,7 @@ from plumbum import cli
 from plumbum.machines import SshMachine
 from plumbum import local
 from plumbum import FG
+from plumbum import BG
 
 # Initialize
 logger = logging.getLogger("ClusterOps")
@@ -27,13 +28,13 @@ class ClusterOps(cli.Application):
     @cli.switch(['-d', '--debug'], help='Enable debug logging')
     def set_debug(self):
         """Sets debug mode"""
+        # logging.basicConfig(level = logging.DEBUG)
         logger.setLevel(logging.DEBUG)
         for handler in logger.handlers:
             handler.setLevel( logging.DEBUG )
 
     @cli.switch(['-s', '--simple'], help='sets the simple log format')
-    def set_debug(self):
-        """Sets debug mode"""
+    def set_simple(self):
         for handler in logger.handlers:
             formatter = logging.Formatter('%(message)s')
             handler.setFormatter(formatter)
@@ -84,27 +85,31 @@ class ClusterOpsCopy(cli.Application):
     """Copy the specified file to each node in the hosts list"""
 
     def main(self, local_file, remote_path):
-        scp = local[ 'scp' ]
+        for host in self.parent._hosts:
+            with SshMachine( host, user=self.parent._user,
+                    password=self.parent._password,
+                    ssh_opts=('-t', '-o StrictHostKeychecking=no' )
+                    ) as rem:
+                logger.info('Copying local file: %s to remote path:%s:%s' % (local_file, host, remote_path) )
+                rem.upload( local_file, remote_path )
 
-        for host in hosts:
-            logger.info('Copying local file: %s to remote path:%s:%s' % (local_file, host, remote_path) )
-            copy = scp[ '-i', keyfile, local_file, '%s@%s:%s' % (self._user,host, remote_path) ]
-
-            logger.debug(copy)
-            copy()
-
-# with SshMachine( host, user=self.parent._user, keyfile=self._keyfile, ssh_opts=('-t', )) as rem:
-@ClusterOps.subcommand("run")
-class ClusterOpsPush(cli.Application):
-    """ Executes the command with the specified arguments"""
+@ClusterOps.subcommand("sudo")
+class ClusterOpsRun(cli.Application):
+    """ Executes the command with the specified arguments as sudo"""
     def main(self, command_path, *args):
         for host in self.parent._hosts:
             logger.debug('Connecting to host %s' % host)
-            with SshMachine( host, user=self.parent._user, keyfile=self.parent._keyfile, ssh_opts=('-t', '-o StrictHostKeychecking=no' )) as rem:
-                comm = rem[ command_path ]
-                arg_comm = comm[ args ]
-                logger.info('Executing [ host=%s command="%s" ]' % (host, arg_comm) )
-                print arg_comm()
+            with SshMachine( host, user=self.parent._user,
+                    password=self.parent._password, ssh_opts=('-tt', '-o StrictHostKeychecking=no')
+                    ) as rem:
+
+                echo = local[ 'echo' ]
+                sudo = rem[ 'sudo' ]
+                comm = (echo[ self.parent._password ] | sudo[ '-S', command_path, args ])
+
+                logger.debug('Executing [ host=%s command="%s" ]' % (host, comm) )
+                logger.info('Executing [ host=%s command="%s" ]' % (host, command_path + " ".join( args )) )
+                comm & BG
 
 if __name__ == "__main__":
     ClusterOps.run()
