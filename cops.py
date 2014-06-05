@@ -24,11 +24,28 @@ class ClusterOps(cli.Application):
     """ Azure Cluster Operations Tool"""
     VERSION = "0.1"
 
+    @cli.switch(['-d', '--debug'], help='Enable debug logging')
+    def set_debug(self):
+        """Sets debug mode"""
+        logger.setLevel(logging.DEBUG)
+        for handler in logger.handlers:
+            handler.setLevel( logging.DEBUG )
+
+    @cli.switch(['-s', '--simple'], help='sets the simple log format')
+    def set_debug(self):
+        """Sets debug mode"""
+        for handler in logger.handlers:
+            formatter = logging.Formatter('%(message)s')
+            handler.setFormatter(formatter)
+
     _user = cli.SwitchAttr( ['-u', '--user-name'], str, mandatory = True,
             help='Username to use to login to remote hosts')
 
-    _keyfile = cli.SwitchAttr( ['-k', '--key-file'], cli.ExistingFile, mandatory = True,
-            help='`pem` file for login to remote hosts')
+    _keyfile = cli.SwitchAttr( ['-k', '--key-file'], cli.ExistingFile,
+             help='`pem` file for login to remote hosts')
+
+    _password= cli.SwitchAttr( ['-p', '--password'], str, mandatory = True,
+             help='password for login')
 
     _host_list = cli.SwitchAttr( ['-n', '--host-name'], str, group='Host List',
             excludes=[ '-f', '--host-file' ], list=True, help='hosts to operate upon')
@@ -36,15 +53,25 @@ class ClusterOps(cli.Application):
     _host_file = cli.SwitchAttr( ['-f', '--host-file'], cli.ExistingFile, group='Host List',
             excludes=[ '-n', '--host-name' ], help='hosts to operate upon')
 
+    def load_hosts(self):
+        if self._host_list and self._host_file:
+            print "Only one of --host-name and --host-file can be created"
+            return 1
+        elif self._host_list:
+            self._hosts = [i.strip() for i in self._host_list]
+        elif self._host_file:
+            with open( self._host_file._path, 'r' ) as of:
+                self._hosts = [line.strip() for line in of]
+        else:
+            print "Specify --host-name OR --host-file"
+            return 1
 
-    @cli.Flag(['-d', '--debug'], help='Enable debug logging')
-    def set_debug(self):
-        """Sets debug mode"""
-        logger.setLevel(logging.DEBUG)
-        for handler in logger.handlers:
-            handler.setLevel( logging.DEBUG )
+        logger.debug( "Hosts loaded - %s " % self._hosts )
 
     def main(self, *args):
+        rc = self.load_hosts()
+        if rc:
+            return 1
         if args:
             print "Unknown command %r" % (args[0],)
             return 1   # error exit code
@@ -66,17 +93,18 @@ class ClusterOpsCopy(cli.Application):
             logger.debug(copy)
             copy()
 
+# with SshMachine( host, user=self.parent._user, keyfile=self._keyfile, ssh_opts=('-t', )) as rem:
 @ClusterOps.subcommand("run")
 class ClusterOpsPush(cli.Application):
     """ Executes the command with the specified arguments"""
     def main(self, command_path, *args):
-        for host in hosts:
+        for host in self.parent._hosts:
             logger.debug('Connecting to host %s' % host)
-            with SshMachine( host, user=self._user, keyfile=self._keyfile, ssh_opts=('-t', )) as rem:
+            with SshMachine( host, user=self.parent._user, keyfile=self.parent._keyfile, ssh_opts=('-t', '-o StrictHostKeychecking=no' )) as rem:
                 comm = rem[ command_path ]
                 arg_comm = comm[ args ]
-                logger.info(' Executing [ host=%s command="%s" ] ' % (host, arg_comm) )
-                arg_comm & FG
+                logger.info('Executing [ host=%s command="%s" ]' % (host, arg_comm) )
+                print arg_comm()
 
 if __name__ == "__main__":
     ClusterOps.run()
