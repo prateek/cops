@@ -45,9 +45,6 @@ class ClusterOps(cli.Application):
     _keyfile = cli.SwitchAttr( ['-k', '--key-file'], cli.ExistingFile,
              help='`pem` file for login to remote hosts')
 
-    _password= cli.SwitchAttr( ['-p', '--password'], str, mandatory = True,
-             help='password for login')
-
     _host_list = cli.SwitchAttr( ['-n', '--host-name'], str, group='Host List',
             excludes=[ '-f', '--host-file' ], list=True, help='hosts to operate upon')
 
