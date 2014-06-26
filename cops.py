@@ -86,7 +86,15 @@ class ClusterOpsCopy(cli.Application):
 
     def main(self, local_file, remote_path):
         for host in self.parent._hosts:
-            with SshMachine( host, user=self.parent._user,
+            hn = host
+            port = 22
+            toks = host.split(":")
+            if len(toks) == 2:
+                hn = toks[0]
+                port = int(toks[1])
+
+            logger.debug('Connecting to host %s' % host)
+            with SshMachine( hn, port=port, user=self.parent._user,
                     password=self.parent._password,
                     ssh_opts=('-t', '-o StrictHostKeychecking=no' )
                     ) as rem:
@@ -98,8 +106,15 @@ class ClusterOpsRun(cli.Application):
     """ Executes the command with the specified arguments as sudo"""
     def main(self, command_path, *args):
         for host in self.parent._hosts:
+            hn = host
+            port = 22
+            toks = host.split(":")
+            if len(toks) == 2:
+                hn = toks[0]
+                port = int(toks[1])
+
             logger.debug('Connecting to host %s' % host)
-            with SshMachine( host, user=self.parent._user,
+            with SshMachine( hn, port=port, user=self.parent._user,
                     password=self.parent._password, ssh_opts=('-tt', '-o StrictHostKeychecking=no')
                     ) as rem:
 
@@ -109,7 +124,7 @@ class ClusterOpsRun(cli.Application):
 
                 logger.debug('Executing [ host=%s command="%s" ]' % (host, comm) )
                 logger.info('Executing [ host=%s command="%s" ]' % (host, command_path + " ".join( args )) )
-                comm & BG
+                print comm()
 
 if __name__ == "__main__":
     ClusterOps.run()
