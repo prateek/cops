@@ -95,7 +95,7 @@ class ClusterOpsCopy(cli.Application):
 
             logger.debug('Connecting to host %s' % host)
             with SshMachine( hn, port=port, user=self.parent._user,
-                    password=self.parent._password,
+                    keyfile=self.parent._keyfile,
                     ssh_opts=('-t', '-o StrictHostKeychecking=no' )
                     ) as rem:
                 logger.info('Copying local file: %s to remote path:%s:%s' % (local_file, host, remote_path) )
@@ -115,12 +115,13 @@ class ClusterOpsRun(cli.Application):
 
             logger.debug('Connecting to host %s' % host)
             with SshMachine( hn, port=port, user=self.parent._user,
-                    password=self.parent._password, ssh_opts=('-tt', '-o StrictHostKeychecking=no')
+                    keyfile=self.parent._keyfile,
+                    ssh_opts=('-tt', '-o StrictHostKeychecking=no')
                     ) as rem:
 
                 echo = local[ 'echo' ]
                 sudo = rem[ 'sudo' ]
-                comm = (echo[ self.parent._password ] | sudo[ '-S', command_path, args ])
+                comm = sudo[ command_path, args ]
 
                 logger.debug('Executing [ host=%s command="%s" ]' % (host, comm) )
                 logger.info('Executing [ host=%s command="%s" ]' % (host, command_path + " ".join( args )) )
