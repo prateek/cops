@@ -28,7 +28,7 @@ class ClusterOps(cli.Application):
     @cli.switch(['-d', '--debug'], help='Enable debug logging')
     def set_debug(self):
         """Sets debug mode"""
-        # logging.basicConfig(level = logging.DEBUG)
+        logging.basicConfig(level = logging.DEBUG)
         logger.setLevel(logging.DEBUG)
         for handler in logger.handlers:
             handler.setLevel( logging.DEBUG )
@@ -115,7 +115,7 @@ class ClusterOpsRun(cli.Application):
 
             logger.debug('Connecting to host %s' % host)
             with SshMachine( hn, port=port, user=self.parent._user,
-                    password=self.parent._password, ssh_opts=('-tt', '-o StrictHostKeychecking=no')
+                    password=self.parent._password, ssh_opts=('-t', '-o StrictHostKeychecking=no')
                     ) as rem:
 
                 echo = local[ 'echo' ]
